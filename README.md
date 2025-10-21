@@ -2,5 +2,5 @@
 Script - certificado PFX
 
 Requisito: 
- - cerificado PFX
+ - Cerificado PFX
  - Chave-Privada
