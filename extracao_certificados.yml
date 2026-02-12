@@ -1,0 +1,61 @@
+---
+- name: Extração de certificados e chaves de arquivos PFX
+  hosts: all
+  become: true
+  vars:
+    input_cert_pfx: "/caminho/arquivo.pfx"
+    pfx_password: "SENHA_AQUI"
+    cert_out: "/caminho/certificado.crt"
+    key_out: "/caminho/chave.key"
+    chain_out: "/caminho/ca-chain.pem"
+
+  tasks:
+    - name: Verificar se openssl está instalado
+      ansible.builtin.package:
+        name: openssl
+        state: present
+
+    - name: Verificar se arquivo PFX existe
+      ansible.builtin.stat:
+        path: "{{ input_cert_pfx }}"
+      register: pfx_file
+
+    - name: Falhar se arquivo PFX não existe
+      ansible.builtin.fail:
+        msg: "O arquivo {{ input_cert_pfx }} não foi encontrado."
+      when: not pfx_file.stat.exists
+
+    - name: Extrair chave privada do PFX
+      ansible.builtin.command: >
+        openssl pkcs12 -in {{ input_cert_pfx }}
+        -nocerts -out {{ key_out }}
+        -password pass:{{ pfx_password }} -nodes
+      args:
+        creates: "{{ key_out }}"
+
+    - name: Remover senha da chave privada
+      ansible.builtin.command: >
+        openssl rsa -in {{ key_out }} -out {{ key_out }}
+      args:
+        removes: "{{ key_out }}"
+        creates: "{{ key_out }}"
+
+    - name: Extrair certificado do PFX
+      ansible.builtin.command: >
+        openssl pkcs12 -in {{ input_cert_pfx }}
+        -nokeys -clcerts -out {{ cert_out }}
+        -password pass:{{ pfx_password }}
+      args:
+        creates: "{{ cert_out }}"
+
+    - name: Extrair cadeia de certificados (CA)
+      ansible.builtin.command: >
+        openssl pkcs12 -in {{ input_cert_pfx }}
+        -nokeys -cacerts -out {{ chain_out }}
+        -password pass:{{ pfx_password }}
+      args:
+        creates: "{{ chain_out }}"
+
+    - name: Mensagem final
+      ansible.builtin.debug:
+        msg: "Extração concluída com sucesso! Certificado: {{ cert_out }}, Chave: {{ key_out }}, Cadeia: {{ chain_out }}"
