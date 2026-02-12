@@ -1,43 +1,60 @@
 #!/bin/bash
-# Script de extração de certificados e chaves do PFX
-# Criado por gabito
+# Script atualizado para extração de certificados e chaves de arquivos PFX
+# Autor original: gabito | Revisão: 2026
 
-# Inputação de Dados
-read -p "Entre com o nome do arquivo PFX: " INPUT_CERT_PFX
-echo ""
-read -s -p "Entre com o password: " PFXPASS
-echo ""
+set -euo pipefail
 
-echo ""
-echo "Certificado a ser extraído: $INPUT_CERT_PFX"
-echo ""
-
-# Verificando se arquivo EXISTE
-if [ ! -f "$INPUT_CERT_PFX" ]; then
-    echo "O arquivo '$INPUT_CERT_PFX' NÃO existe." >&2
+# Função de ajuda
+usage() {
+    echo "Uso: $0 -f arquivo.pfx -p senha [-c cert.pem] [-k chave.key] [-a cadeia.pem]"
     exit 1
-else
-    echo "O arquivo '$INPUT_CERT_PFX' existe."
-fi
+}
+
+# Verifica dependência
+command -v openssl >/dev/null 2>&1 || { echo "Erro: openssl não está instalado."; exit 1; }
+
+# Parâmetros
+INPUT_CERT_PFX=""
+PFXPASS=""
+CERT_OUT=""
+KEY_OUT=""
+CHAIN_OUT=""
+
+while getopts "f:p:c:k:a:" opt; do
+  case $opt in
+    f) INPUT_CERT_PFX="$OPTARG" ;;
+    p) PFXPASS="$OPTARG" ;;
+    c) CERT_OUT="$OPTARG" ;;
+    k) KEY_OUT="$OPTARG" ;;
+    a) CHAIN_OUT="$OPTARG" ;;
+    *) usage ;;
+  esac
+done
+
+# Valida entrada
+[ -z "$INPUT_CERT_PFX" ] && usage
+[ -z "$PFXPASS" ] && usage
+
+[ ! -f "$INPUT_CERT_PFX" ] && { echo "Erro: arquivo '$INPUT_CERT_PFX' não encontrado."; exit 1; }
+
+# Define nomes padrão se não informados
+CERT_OUT=${CERT_OUT:-"${INPUT_CERT_PFX%.pfx}.crt"}
+KEY_OUT=${KEY_OUT:-"${INPUT_CERT_PFX%.pfx}.key"}
+CHAIN_OUT=${CHAIN_OUT:-"${INPUT_CERT_PFX%.pfx}-ca.pem"}
+
+echo "Extraindo de: $INPUT_CERT_PFX"
+echo "Certificado: $CERT_OUT"
+echo "Chave: $KEY_OUT"
+echo "Cadeia: $CHAIN_OUT"
 
 # Extraindo chave privada
-echo "Extraindo a chave privada..."
-openssl pkcs12 -in "$INPUT_CERT_PFX" -nocerts -out "${INPUT_CERT_PFX%.pfx}.key" -password pass:"$PFXPASS" -nodes
-echo "Chave privada extraída com sucesso."
+openssl pkcs12 -in "$INPUT_CERT_PFX" -nocerts -out "$KEY_OUT" -password pass:"$PFXPASS" -nodes
+openssl rsa -in "$KEY_OUT" -out "$KEY_OUT"  # remove senha
 
 # Extraindo certificado
-echo ""
-echo "Extraindo o certificado..."
-openssl pkcs12 -in "$INPUT_CERT_PFX" -nokeys -out "${INPUT_CERT_PFX%.pfx}.pem" -password pass:"$PFXPASS"
-echo "Certificado extraído com sucesso."
+openssl pkcs12 -in "$INPUT_CERT_PFX" -nokeys -clcerts -out "$CERT_OUT" -password pass:"$PFXPASS"
 
-# Removendo senha da chave
-echo ""
-echo "Removendo a senha da chave..."
-openssl rsa -in "${INPUT_CERT_PFX%.pfx}.key" -out "${INPUT_CERT_PFX%.pfx}.key.nopass"
-mv "${INPUT_CERT_PFX%.pfx}.key.nopass" "${INPUT_CERT_PFX%.pfx}.key"
-echo "Senha removida da chave."
+# Extraindo cadeia de certificados (CA)
+openssl pkcs12 -in "$INPUT_CERT_PFX" -nokeys -cacerts -out "$CHAIN_OUT" -password pass:"$PFXPASS"
 
-echo ""
-echo "FIM"
-exit 0
+echo "Extração concluída com sucesso!"
