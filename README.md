@@ -24,6 +24,6 @@ As variáveis podem ser definidas diretamente no playbook ou em um arquivo de in
 vars:
   input_cert_pfx: "/caminho/para/arquivo.pfx"
   pfx_password: "SENHA_AQUI"
-  cert_out: "/caminho/para/certificado.crt"
-  key_out: "/caminho/para/chave.key"
-  chain_out: "/caminho/para/ca-chain.pem"
+  cert_out: "/caminho/certificado.crt"
+  key_out: "/caminho/chave.key"
+  chain_out: "/caminho/ca-chain.pem"
